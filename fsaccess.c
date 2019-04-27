@@ -1,9 +1,11 @@
-//Adam Nguyen
-//Arun Palaniappan
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <math.h>
 
 struct superBlock {
 	unsigned short isize;
@@ -40,6 +42,7 @@ unsigned int tempArray[512];
 
 unsigned int freeBlock(int n);
 unsigned int allocFreeBlock();
+unsigned short allocINode();
 int freeINode(int fd, int n);
 
 int main(){
@@ -54,6 +57,10 @@ struct directory dir;
 struct inode tempNode;
 struct inode tempNode1;
 struct inode cpinNode;
+struct inode rootNode;
+struct directory rootDir;
+struct inode cpoutNode;
+struct directory cpoutDir;
 while (1)
 {
 char command[64];
@@ -109,8 +116,8 @@ else if (strcmp(args[0], "initfs") == 0)
 			sb.isize = (numNodes / 16) + 1;
 		sb.ninode = 100;
 		sb.nfree = 0;
-		int nodeStart = (numBlocks + 2) * 512;
-		lseek(fd, nodeStart, SEEK_SET);
+		//int nodeStart = (numBlocks + 2) * 512;
+		//lseek(fd, nodeStart, SEEK_SET);
 		for(i = 0; i < 100; i++)
 		{
 			sb.free[i] = 0;		//Clear free[]
@@ -180,25 +187,19 @@ else if (strcmp(args[0], "initfs") == 0)
 		}
 		
 		//Create root directory
-		struct directory rootDir;
-		struct inode rootNode;
 		unsigned short rootBlock = allocFreeBlock();
-		for(i = 0; i < 14; i++)
-		{
-			rootDir.name[i] = 0;
-		}
+		memset(rootDir.name, 0, 14 * sizeof(rootDir.name[0]));
 		rootDir.name[0] = '.';
 		rootDir.name[1] = '\0';
-		rootDir.inode = 1;
-		rootNode.flags = 140077;
+		rootDir.inodeNumber = 1;
+		rootNode.flag = 140077;
 		rootNode.nlinks = 2;
 		rootNode.uid = '0';
 		rootNode.gid = '0';
-		rootNode.size0 = '0';
-		rootNode.size1 = 32;
+		rootNode.fsize1 = '0';
+		rootNode.fsize2 = 32;
+		memset(rootNode.addr, 0, 8 * sizeof(rootNode.addr[0]));
 		rootNode.addr[0] = rootBlock;
-		for(i = 1; i < 8; i++)
-			rootNode.addr[i] = 0;
 		rootNode.actime[0] = 0;
 		rootNode.modtime[0] = 0;
 		rootNode.modtime[1] = 0;
@@ -219,7 +220,7 @@ else if (strcmp(args[0], "mkdir") == 0)
 	unsigned int bNum = allocFreeBlock();
 	unsigned int nNum = allocINode();
 	strncpy(dir.name, dname, 14);
-	dir.inode = nNum;
+	dir.inodeNumber = nNum;
 	lseek(fd, 2 * 512, SEEK_SET);
 	//Create directory inode
 	tempNode1.flag = 140077;
@@ -228,29 +229,27 @@ else if (strcmp(args[0], "mkdir") == 0)
 	tempNode1.gid = '0';
 	tempNode1.fsize1 = '0';
 	tempNode1.fsize2 = 32;
-	tempNode1.addr[0] = dNum;
-	
-	for(i = 1; i < 8; i++)
-		tempNode1.addr[i] = 0;
+	memset(tempNode1.addr, 0, 8 * sizeof(tempNode.addr[0]));
+	tempNode1.addr[0] = bNum;
 	tempNode1.actime[0] = 0;
 	tempNode1.modtime[0] = 0;
 	tempNode1.modtime[1] = 0;
 	
-	lseek(fd, 2 * 512 + (nNum * sb.isize), SEEK_SET);
+	lseek(fd, 1024 + (nNum * sb.isize), SEEK_SET);
 	write(fd, &tempNode1, sb.isize);
-	lseek(fd, 2 * 512, SEEK_SET);
+	lseek(fd, 1024, SEEK_SET);
 	int blck = read(fd, &tempNode1, sizeof(tempNode1));
 	tempNode1.nlinks++;
 	
+	lseek(fd, 1024, SEEK_SET);
+	read(fd, &)
 	printf("Directory created.\n");
 }
 else if (strcmp(args[0], "cpin") == 0)
 {
-	char* f1 = args[1]
-	char* f2 = args[2]
+	char* f1 = args[1];
+	char* f2 = args[2];
 	int infd;
-	int infdSize = 0;
-	int reader;
 	char buff[512];
 	int readSize;
 	off_t cpinsize;
@@ -268,14 +267,14 @@ else if (strcmp(args[0], "cpin") == 0)
 	}
 	unsigned int tempBlock = allocFreeBlock();
 	
-	rootDir.inode = cpinInum;
+	rootDir.inodeNumber = cpinInum;
 	memcpy(rootDir.name, f2, strlen(f2));
 	cpinNode.flag = 100077;
 	cpinNode.nlinks = 1;
 	cpinNode.uid = '0';
 	cpinNode.gid = '0';
-	cpinNode.size0 = '0';
-	cpinNode.size1 = cpinsize;
+	cpinNode.fsize1 = '0';
+	cpinNode.fsize2 = cpinsize;
 	cpinNode.actime[0] = 0;
 	cpinNode.modtime[0] = 0;
 	cpinNode.modtime[1] = 0;
@@ -289,12 +288,79 @@ else if (strcmp(args[0], "cpin") == 0)
 			cpinNode.addr[i] = tempBlock;
 			if(readSize < 512)
 			{
-				
+				break;
 			}
+		}
+		break;
+	}
+	lseek(fd, 2 * 512 + cpinInum * 32, SEEK_SET);
+	write(fd, &cpinNode, 32);
+	cpinNode.nlinks++;
+}
+else if (strcmp(args[0], "cpout") == 0)
+{
+	char* f3 = args[1];
+	char* f4 = args[2];
+	char bufff[512];
+	int outfd;
+	int counter;
+	int dirFound = 0;
+	int outNode;
+	int blocksUsed;
+	int extraBytes;
+	if((outfd = open(f4, O_RDWR | O_CREAT, 0600)) == -1)
+	{
+		printf("File opened unsuccessfully.\n");
+		break;
+	}
+	lseek(fd, 1024, SEEK_SET);
+	read(fd, &cpoutNode, 32);
+	for(counter = 0; counter <= 7; counter++)
+	{
+		if(dirFound != 1)
+		{
+			lseek(fd, (cpoutNode.addr[counter] * 512), SEEK_SET);
+			for(i = 0; i < 32; i++)
+			{
+				read(fd, &cpoutDir, 16);
+				if(strcmp(cpoutDir.name, f3) == 0)
+				{
+					outNode = cpoutDir.inodeNumber;
+					dirFound = 1;
+				}
+			}
+		}
+	}
+	
+	if(outNode == 0)
+	{
+		printf("Source file not found.\n");
+		break;
+	}
+	
+	lseek(fd, 1056 * outNode, SEEK_SET);
+	read(fd, &cpoutNode, 32);
+	
+	blocksUsed = (int)ceil(cpoutNode.fsize2 / 512.0);
+	extraBytes = cpoutNode.fsize2 % 512;
+	
+	for(i = 0; i < blocksUsed; i++)
+	{
+		lseek(fd, (cpoutNode.addr[i]) * 512, SEEK_SET);
+		read(fd, bufff, 512);
+		if(i == (blocksUsed - 1))
+		{
+			write(outfd, bufff, extraBytes);
+			printf("cpout successful.\n");
+		}
+		else
+		{
+			write(outfd, bufff, 512);
 		}
 	}
 }
 }
+printf("Program terminated.\n");
 }
 
 unsigned int freeBlock(int n)
