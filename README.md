@@ -18,7 +18,7 @@ Important Notes:
 *fsaccess.c and data file must be in the same folder*\
 *must mount then initfs before performing actions on file system*\
 *invalid commands or arguments will terminate the program*\
-*command "q" must be used when wanting to exit the program*\
+*command "q" must be used when wanting to exit the program*
 
 Sample Run:
 
