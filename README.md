@@ -22,13 +22,13 @@ Important Notes:
 
 Sample Run:
 
-Enter command: mount file.data
-File successfully mounted.
-Enter command: initfs 8000 300
-File system initiated.
-Enter command: cpin extFile.txt /in.txt
-File copy successful.
-Enter command: cpout /in.txt out.txt
-cpout successful.
-Enter command: q
+Enter command: mount file.data\
+File successfully mounted.\
+Enter command: initfs 8000 300\
+File system initiated.\
+Enter command: cpin extFile.txt /in.txt\
+File copy successful.\
+Enter command: cpout /in.txt out.txt\
+cpout successful.\
+Enter command: q\
 Program terminated.
